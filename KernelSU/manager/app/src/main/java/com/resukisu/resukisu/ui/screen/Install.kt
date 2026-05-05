@@ -1081,11 +1081,15 @@ private fun TopBar(
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(cardAlpha),
             scrolledContainerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(cardAlpha),
         ),
         navigationIcon = {
             AppBackButton(

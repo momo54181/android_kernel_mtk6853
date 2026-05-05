@@ -223,8 +223,10 @@ fun SearchAppBar(
         modifier = modifier
             .fillMaxWidth()
             .background(
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha)
             )
             .then(
                 if (haze) {

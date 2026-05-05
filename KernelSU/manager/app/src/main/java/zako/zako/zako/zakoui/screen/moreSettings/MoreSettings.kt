@@ -36,16 +36,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Brush
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.FormatColorFill
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Wallpaper
@@ -79,7 +81,6 @@ import androidx.core.content.FileProvider
 import com.resukisu.resukisu.R
 import com.resukisu.resukisu.ui.MainActivity
 import com.resukisu.resukisu.ui.component.ConfirmResult
-import com.resukisu.resukisu.ui.component.ksuIsValid
 import com.resukisu.resukisu.ui.component.rememberConfirmDialog
 import com.resukisu.resukisu.ui.component.settings.AppBackButton
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
@@ -89,6 +90,7 @@ import com.resukisu.resukisu.ui.component.settings.SettingsSwitchWidget
 import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
 import com.resukisu.resukisu.ui.component.settings.SplicedGroupScope
 import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.theme.BackgroundManager
 import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeColors
 import com.resukisu.resukisu.ui.theme.ThemeConfig
@@ -228,11 +230,15 @@ fun MoreSettingsScreen() {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                     scrolledContainerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                 ),
                 windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
                 scrollBehavior = scrollBehavior
@@ -267,16 +273,6 @@ fun MoreSettingsScreen() {
                     state = settingsState,
                     handlers = settingsHandlers
                 )
-            }
-
-            if (ksuIsValid()) {
-                // 高级设置
-                item {
-                    AdvancedSettings(
-                        state = settingsState,
-                        handlers = settingsHandlers
-                    )
-                }
             }
 
             item {
@@ -491,45 +487,6 @@ private fun SplicedGroupScope.hideOptionsSettings(
 }
 
 @Composable
-private fun AdvancedSettings(
-    state: MoreSettingsState,
-    handlers: MoreSettingsHandlers
-) {
-
-    SplicedColumnGroup(title = stringResource(R.string.advanced_settings)) {
-        item {
-            // SELinux 开关
-            SettingsSwitchWidget(
-                icon = Icons.Filled.Security,
-                title = stringResource(R.string.selinux),
-                description = if (state.selinuxEnabled)
-                    stringResource(R.string.selinux_enabled) else
-                    stringResource(R.string.selinux_disabled),
-                checked = state.selinuxEnabled,
-                onCheckedChange = handlers::handleSelinuxChange
-            )
-        }
-
-        item {
-            // 动态管理器设置
-            SettingsJumpPageWidget(
-                icon = Icons.Filled.Security,
-                title = stringResource(R.string.dynamic_manager_title),
-                description = if (state.isDynamicSignEnabled) {
-                    stringResource(
-                        R.string.dynamic_manager_enabled_summary,
-                        state.dynamicSignSize
-                    )
-                } else {
-                    stringResource(R.string.dynamic_manager_disabled)
-                },
-                onClick = { state.showDynamicSignDialog = true }
-            )
-        }
-    }
-}
-
-@Composable
 private fun ThemeColorSelection(state: MoreSettingsState) {
     SettingsBaseWidget(
         icon = Icons.Default.Palette,
@@ -620,7 +577,6 @@ private fun DpiSliderControls(
                 state.isDpiCustom = !state.dpiPresets.containsValue(state.tempDpi)
             },
             valueRange = 160f..600f,
-            steps = 11,
             colors = SliderDefaults.colors(
                 thumbColor = MaterialTheme.colorScheme.primary,
                 activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -751,13 +707,50 @@ private fun BackgroundAdjustmentControls(
     handlers: MoreSettingsHandlers,
     coroutineScope: CoroutineScope
 ) {
-    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        // 透明度滑动条
-        AlphaSlider(state = state, handlers = handlers, coroutineScope = coroutineScope)
+    val context = LocalContext.current
 
-        // TODO Set an default Dim for background
-        // 亮度调节滑动条
-        DimSlider(state = state, handlers = handlers, coroutineScope = coroutineScope)
+    Column {
+        Column(modifier = Modifier
+            .padding(horizontal = 16.dp)
+            .padding(top = 8.dp)) {
+            AlphaSlider(state = state, handlers = handlers, coroutineScope = coroutineScope)
+            DimSlider(state = state, handlers = handlers, coroutineScope = coroutineScope)
+        }
+        SettingsSwitchWidget(
+            icon = Icons.Filled.BlurOn,
+            title = stringResource(id = R.string.settings_config_enable_blur),
+            description = stringResource(id = R.string.settings_config_enable_blur_summary),
+            checked = ThemeConfig.isEnableBlur,
+            onCheckedChange = { isChecked ->
+                BackgroundManager.saveEnableBlur(context, isChecked)
+            }
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AnimatedVisibility(
+                visible = state.useDynamicColor,
+                enter = fadeIn() + slideInVertically(),
+                exit = fadeOut() + slideOutVertically()
+            ) {
+                SettingsSwitchWidget(
+                    icon = Icons.Filled.FormatColorFill,
+                    title = stringResource(id = R.string.settings_config_use_custom_background_seed_color),
+                    description = stringResource(id = R.string.settings_config_use_custom_background_seed_color_summary),
+                    checked = ThemeConfig.isUseBackgroundSeedColor,
+                    onCheckedChange = { isChecked ->
+                        BackgroundManager.saveUseBackgroundSeedColor(context, isChecked)
+                    }
+                )
+            }
+        }
+        SettingsSwitchWidget(
+            icon = Icons.Filled.Contrast,
+            title = stringResource(id = R.string.settings_custom_enable_high_contrast),
+            description = stringResource(id = R.string.settings_custom_enable_high_contrast_summary),
+            checked = ThemeConfig.isHighContrastMode,
+            onCheckedChange = { isChecked ->
+                BackgroundManager.saveEnableHighContrastMode(context, isChecked)
+            }
+        )
     }
 }
 
@@ -805,7 +798,6 @@ private fun AlphaSlider(
             }
         },
         valueRange = 0f..1f,
-        steps = 20,
         colors = SliderDefaults.colors(
             thumbColor = MaterialTheme.colorScheme.primary,
             activeTrackColor = MaterialTheme.colorScheme.primary,
@@ -858,7 +850,6 @@ private fun DimSlider(
             }
         },
         valueRange = 0f..1f,
-        steps = 20,
         colors = SliderDefaults.colors(
             thumbColor = MaterialTheme.colorScheme.primary,
             activeTrackColor = MaterialTheme.colorScheme.primary,

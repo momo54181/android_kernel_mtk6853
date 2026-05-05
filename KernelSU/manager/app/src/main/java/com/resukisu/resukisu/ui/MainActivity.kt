@@ -553,7 +553,7 @@ class MainActivity : ComponentActivity() {
                                             MaterialTheme.colorScheme.surfaceContainer
 
                                         CompositionLocalProvider(
-                                            LocalHazeState provides if (CardConfig.isCustomBackgroundEnabled) rememberHazeState() else null,
+                                            LocalHazeState provides if (ThemeConfig.isEnableBlur) rememberHazeState() else null,
                                             LocalSnackbarHost provides snackBarHostState,
                                         ) {
                                             Surface(

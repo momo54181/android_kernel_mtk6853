@@ -62,6 +62,7 @@ import com.resukisu.resukisu.ui.component.settings.AppBackButton
 import com.resukisu.resukisu.ui.component.settings.SettingsBaseWidget
 import com.resukisu.resukisu.ui.component.settings.splicedLazyColumnGroup
 import com.resukisu.resukisu.ui.navigation.LocalNavigator
+import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.theme.haze
 import com.resukisu.resukisu.ui.theme.hazeSource
@@ -111,11 +112,15 @@ fun UmountManagerScreen() {
                 scrollBehavior = scrollBehavior,
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                     scrolledContainerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                 )
             )
         },

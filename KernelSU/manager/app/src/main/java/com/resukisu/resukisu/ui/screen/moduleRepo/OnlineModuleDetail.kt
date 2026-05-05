@@ -158,11 +158,15 @@ fun OnlineModuleDetailScreen(module: ModuleRepoViewModel.RepoModule) {
                     },
                     colors = TopAppBarDefaults.topAppBarColors().copy(
                         containerColor =
-                            if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                            else MaterialTheme.colorScheme.surfaceContainer,
+                            if (ThemeConfig.isEnableBlur)
+                                Color.Transparent
+                            else
+                                MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                         scrolledContainerColor =
-                            if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                            else MaterialTheme.colorScheme.surfaceContainer
+                            if (ThemeConfig.isEnableBlur)
+                                Color.Transparent
+                            else
+                                MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha)
                     ),
                     windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
                 )
@@ -170,8 +174,10 @@ fun OnlineModuleDetailScreen(module: ModuleRepoViewModel.RepoModule) {
                 PrimaryTabRow(
                     selectedTabIndex = pagerState.currentPage,
                     containerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     tabTitles.forEachIndexed { index, title ->

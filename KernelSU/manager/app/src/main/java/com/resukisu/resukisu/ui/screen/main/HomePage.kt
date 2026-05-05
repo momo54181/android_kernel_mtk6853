@@ -108,6 +108,7 @@ import com.resukisu.resukisu.ui.component.rememberLoadingDialog
 import com.resukisu.resukisu.ui.navigation.LocalNavigator
 import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.LabelText
+import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.CardConfig.cardElevation
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.theme.getCardColors
@@ -439,11 +440,15 @@ private fun TopBar(
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
             scrolledContainerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
         ),
         actions = {
             if (viewModel.isCoreDataLoaded) {

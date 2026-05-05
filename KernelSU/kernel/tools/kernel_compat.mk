@@ -109,9 +109,33 @@ endif
 
 # policy rwlock
 # kernel 4.14-
+ifeq ($(shell grep -q "^static DEFINE_RWLOCK(policy_rwlock);" $(srctree)/security/selinux/ss/services.c; echo $$?),0)
+$(info -- $(REPO_NAME)/compat: policy_rwlock found,but not exported.)
+$(info -- $(REPO_NAME)/compat: We recommend you export it to avoid some probably race problem.)
+$(info -- $(REPO_NAME)/compat: See: https://resukisu.github.io/guide/manual-integrate.html#policy-rwlock-export)
+$(info -- $(REPO_NAME)/compat: WARNING: You maybe see kernel panic during system boot or modules stop working.)
+ccflags-y += -DKSU_COMPAT_NON_EXPORTED_POLICY_RWLOCK
+endif
+
+
 ifeq ($(shell grep -q "^DEFINE_RWLOCK(policy_rwlock);" $(srctree)/security/selinux/ss/services.c; echo $$?),0)
 $(info -- $(REPO_NAME)/compat: exported policy_rwlock found!)
 ccflags-y += -DKSU_COMPAT_HAS_EXPORTED_POLICY_RWLOCK
+endif
+
+# sel_mutex
+# kernel 4.14-
+ifeq ($(shell grep -q "^static DEFINE_MUTEX(sel_mutex);" $(srctree)/security/selinux/selinuxfs.c; echo $??),0)
+$(info -- $(REPO_NAME)/compat: sel_mutex found,but not exported.)
+$(info -- $(REPO_NAME)/compat: We recommend you export it to avoid some probably race problem.)
+$(info -- $(REPO_NAME)/compat: See: https://resukisu.github.io/guide/manual-integrate.html#sel-mutex-export)
+$(info -- $(REPO_NAME)/compat: WARNING: You maybe see kernel panic during system boot or modules stop working.)
+ccflags-y += -DKSU_COMPAT_NON_EXPORTED_SEL_MUTEX
+endif
+
+ifeq ($(shell grep -q "^DEFINE_MUTEX(sel_mutex);" $(srctree)/security/selinux/selinuxfs.c; echo $$?),0)
+$(info -- $(REPO_NAME)/compat: exported sel_mutex found!)
+ccflags-y += -DKSU_COMPAT_HAS_EXPORTED_SEL_MUTEX
 endif
 
 # Function ns_get_path check
@@ -210,5 +234,17 @@ endif
 # have that can avoid scan selinux_ops
 ifeq ($(shell grep -q "^struct security_operations selinux_ops" $(srctree)/security/selinux/hooks.c; echo $$?),0)
 $(info -- $(REPO_NAME)/compat: exported selinux_ops found!)
-CFLAGS_ksu.o += -DKSU_HAS_EXPORTED_SELINUX_OPS
+ccflags-y += -DKSU_HAS_EXPORTED_SELINUX_OPS
+endif
+
+# Android SPEC Changes
+# https://android-review.googlesource.com/c/kernel/common/+/3009995
+ifeq ($(shell grep -q "POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+$(info -- $(REPO_NAME)/compat: android spec POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE found!!)
+ccflags-y += -DKSU_COMPAT_HAS_POLICYDB_CONFIG_ANDROID_NETLINK_ROUTE
+endif
+
+ifeq ($(shell grep -q "POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH" $(srctree)/security/selinux/ss/policydb.h; echo $$?),0)
+$(info -- $(REPO_NAME)/compat: android spec POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH found!!)
+ccflags-y += -DKSU_COMPAT_HAS_POLICYDB_CONFIG_ANDROID_NETLINK_GETNEIGH
 endif

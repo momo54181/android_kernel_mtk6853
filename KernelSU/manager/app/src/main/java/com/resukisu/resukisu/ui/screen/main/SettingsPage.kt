@@ -108,6 +108,7 @@ import com.resukisu.resukisu.ui.component.settings.SplicedColumnGroup
 import com.resukisu.resukisu.ui.navigation.LocalNavigator
 import com.resukisu.resukisu.ui.navigation.Route
 import com.resukisu.resukisu.ui.screen.FlashIt
+import com.resukisu.resukisu.ui.theme.CardConfig
 import com.resukisu.resukisu.ui.theme.ThemeConfig
 import com.resukisu.resukisu.ui.theme.haze
 import com.resukisu.resukisu.ui.theme.hazeSource
@@ -838,11 +839,15 @@ private fun TopBar(
         },
         colors = TopAppBarDefaults.topAppBarColors(
             containerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer,
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
             scrolledContainerColor =
-                if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                else MaterialTheme.colorScheme.surfaceContainer
+                if (ThemeConfig.isEnableBlur)
+                    Color.Transparent
+                else
+                    MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha)
         ),
         windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
         scrollBehavior = scrollBehavior

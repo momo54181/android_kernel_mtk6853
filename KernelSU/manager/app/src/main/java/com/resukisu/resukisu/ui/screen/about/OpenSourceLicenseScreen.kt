@@ -103,11 +103,15 @@ fun OpenSourceLicenseScreen() {
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                     scrolledContainerColor =
-                        if (ThemeConfig.backgroundImageLoaded) Color.Transparent
-                        else MaterialTheme.colorScheme.surfaceContainer,
+                        if (ThemeConfig.isEnableBlur)
+                            Color.Transparent
+                        else
+                            MaterialTheme.colorScheme.surfaceContainer.copy(CardConfig.cardAlpha),
                 ),
             )
         },
