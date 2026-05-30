@@ -555,6 +555,7 @@ static inline void print_vdm_msg(
 	cmd = PD_VDO_CMD(vdm_hdr);
 	cmd_type = PD_VDO_CMDT(vdm_hdr);
 	svid = PD_VDO_VID(vdm_hdr);
+	(void)svid;  // 新增这一行，消除变量赋值未使用告警
 
 	name = assign_vdm_cmd_name(cmd);
 
