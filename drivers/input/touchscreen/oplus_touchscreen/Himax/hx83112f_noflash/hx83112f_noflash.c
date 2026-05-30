@@ -1550,7 +1550,7 @@ void hx83112f_power_on_init(void)
     hx83112f_sense_on(0x00);
 }
 
-int hx83112f_check_remapping()
+int hx83112f_check_remapping(void)
 {
     uint8_t cmd[4];
     uint8_t data[64];

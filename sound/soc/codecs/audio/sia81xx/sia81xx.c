@@ -1651,11 +1651,11 @@ static int sia81xx_volme_boost_set(
 	return 0;
 }
 
-void sia81xx_start(){
+void sia81xx_start(void){
         sia81xx_resume(g_sia81xx);
 }
 
-void sia81xx_stop(){
+void sia81xx_stop(void){
         sia81xx_suspend(g_sia81xx);
 }
 #endif /* OPLUS_BUG_COMPATIBILITY */
