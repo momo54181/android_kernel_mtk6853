@@ -1,0 +1,253 @@
+#include <linux/init.h>
+#include <linux/types.h>
+#include <net/sock.h>
+#include <linux/netlink.h>
+
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv4.h>
+#include <linux/netfilter_ipv6.h>
+#include <net/rtnetlink.h>
+#include <net/ip.h>
+#include <net/ipv6.h>
+#include <net/tcp.h>
+
+#include "rekernel.h"
+
+static const char *binder_type[] = {
+	"reply",
+	"transaction",
+	"free_buffer_full",
+};
+
+static int netlink_unit = NETLINK_REKERNEL_MIN;
+
+static void netlink_rcv_msg(struct sk_buff* socket_buffer) {
+	/* DO NOTHING */
+}
+static struct sock* netlink_socket = NULL;
+static struct netlink_kernel_cfg rekernel_cfg = {
+	.input = netlink_rcv_msg, // set recv callback
+};
+static int start_rekernel_server(void)
+{
+	if (netlink_socket)
+		return 0;
+
+	for (netlink_unit = NETLINK_REKERNEL_MIN; netlink_unit < NETLINK_REKERNEL_MAX; netlink_unit++) {
+		netlink_socket = netlink_kernel_create(&init_net, netlink_unit, &rekernel_cfg);
+		if (netlink_socket != NULL)
+			break;
+	}
+	if (netlink_socket == NULL) {
+		pr_err("Failed to create Re:Kernel server!\n");
+		return -1;
+	}
+	pr_info("Created Re:Kernel server! NETLINK UNIT: %d\n", netlink_unit);
+	return 0;
+}
+
+static int rekernel_send_netlink_message(char* msg, uint16_t len) {
+	struct sk_buff* skbuffer;
+	struct nlmsghdr* nlhdr;
+
+#ifdef CONFIG_REK_DEBUG
+	pr_info("Sending Re:Kernel Netlink Message: %s", msg);// 事实证明，我们不能打印，打印就该卡成ppt了
+#endif
+
+	skbuffer = nlmsg_new(len, GFP_ATOMIC);
+	if (!skbuffer) {
+#ifdef CONFIG_REK_DEBUG
+		pr_err("netlink alloc failure.\n");
+#endif
+		return -1;
+	}
+
+	nlhdr = nlmsg_put(skbuffer, 0, 0, netlink_unit, len, 0);
+	if (!nlhdr) {
+#ifdef CONFIG_REK_DEBUG
+		pr_err("nlmsg_put failaure.\n");
+#endif
+		nlmsg_free(skbuffer);
+		return -1;
+	}
+
+	memcpy(nlmsg_data(nlhdr), msg, len);
+	return netlink_unicast(netlink_socket, skbuffer, USER_PORT, MSG_DONTWAIT);
+}
+
+void rekernel_report_no_binder_rpc_code(int type, pid_t src_pid, struct task_struct* src, pid_t dst_pid, struct task_struct* dst, bool oneway, char* rpc_name) {
+	char binder_kmsg[PACKET_SIZE];
+
+	if (start_rekernel_server() != 0)
+		return;
+
+	if (!frozen_task_group(dst))
+		return;
+
+	// if (task_uid(src).val == task_uid(dst).val)
+	// 	return;
+
+	snprintf(binder_kmsg, sizeof(binder_kmsg), "type=Binder,bindertype=%s,oneway=%d,from_pid=%d,from=%d,target_pid=%d,target=%d,rpc_name=%s,code=-1;", binder_type[type], oneway, src_pid, task_uid(src).val, dst_pid, task_uid(dst).val, rpc_name);
+	rekernel_send_netlink_message(binder_kmsg, strlen(binder_kmsg));
+}
+
+void rekernel_report(int reporttype, int type, pid_t src_pid, struct task_struct* src, pid_t dst_pid, struct task_struct* dst, bool oneway, char* rpc_name, __u32 code) {
+	char binder_kmsg[PACKET_SIZE];
+
+	if (start_rekernel_server() != 0)
+		return;
+
+	if (!frozen_task_group(dst))
+		return;
+
+	// if (task_uid(src).val == task_uid(dst).val)
+	// 	return;
+
+	switch (reporttype) {
+	case BINDER:
+		snprintf(binder_kmsg, sizeof(binder_kmsg), "type=Binder,bindertype=%s,oneway=%d,from_pid=%d,from=%d,target_pid=%d,target=%d,rpc_name=%s,code=%d;", binder_type[type], oneway, src_pid, task_uid(src).val, dst_pid, task_uid(dst).val, rpc_name, code);
+		break;
+	case SIGNAL:
+		snprintf(binder_kmsg, sizeof(binder_kmsg), "type=Signal,signal=%d,killer_pid=%d,killer=%d,dst_pid=%d,dst=%d;", type, src_pid, task_uid(src).val, dst_pid, task_uid(dst).val);
+		break;
+	default:
+		return;
+	}
+	rekernel_send_netlink_message(binder_kmsg, strlen(binder_kmsg));
+}
+
+static inline uid_t line_sock2uid(struct sock *sk)
+{
+	if (sk && sk->sk_socket)
+		return SOCK_INODE(sk->sk_socket)->i_uid.val;
+	else
+		return 0;
+}
+
+static unsigned int rekernel_pkg_ipv4_ipv6_in(void *priv, struct sk_buff *socket_buffer,
+		const struct nf_hook_state *state)
+{
+	struct sock *sk;
+	unsigned int thoff = 0;
+	unsigned short frag_off = 0;
+	uid_t uid;
+	uint hook;
+	struct net_device *dev = NULL;
+
+	if (!socket_buffer || !socket_buffer->len || !state)
+		return NF_ACCEPT;
+
+	hook = state->hook;
+	if (NF_INET_LOCAL_IN == hook)
+		dev = state->in;
+
+	if (NULL == dev)
+		return NF_ACCEPT;
+
+	if (ip_hdr(socket_buffer)->version == 4) {
+		if (ip_hdr(socket_buffer)->protocol != IPPROTO_TCP)
+			return NF_ACCEPT;
+#if IS_ENABLED(CONFIG_IPV6)
+	} else if (ip_hdr(socket_buffer)->version == 6) {
+		if (ipv6_find_hdr(socket_buffer, &thoff, -1, &frag_off, NULL) != IPPROTO_TCP)
+			return NF_ACCEPT;
+#endif
+	} else {
+		return NF_ACCEPT;
+	}
+
+	sk = skb_to_full_sk(socket_buffer);
+	if (sk == NULL || !sk_fullsock(sk))
+		return NF_ACCEPT;
+
+	uid = line_sock2uid(sk);
+	if (uid < MIN_USERAPP_UID)
+		return NF_ACCEPT;
+
+	if (netlink_socket != NULL) {// 如果 netlink 未开放，则不要发送netlink message 代码复制于 Rekernel LKM
+		char binder_kmsg[PACKET_SIZE];
+		if (ip_hdr(socket_buffer)->version == 4) {
+			snprintf(binder_kmsg, sizeof(binder_kmsg), "type=Network,target=%d,proto=ipv4;", uid);
+#if IS_ENABLED(CONFIG_IPV6)
+		} else if (ip_hdr(socket_buffer)->version == 6) {
+			snprintf(binder_kmsg, sizeof(binder_kmsg), "type=Network,target=%d,proto=ipv6;", uid);
+#endif
+		} else {
+			return NF_ACCEPT;
+		}
+		rekernel_send_netlink_message(binder_kmsg, strlen(binder_kmsg));
+	}
+	
+	return NF_ACCEPT;
+}
+
+/* Only monitor input network packages */
+static struct nf_hook_ops rekernel_nf_ops[] = {
+	{
+		.hook     = rekernel_pkg_ipv4_ipv6_in,
+		.pf       = NFPROTO_IPV4,
+		.hooknum  = NF_INET_LOCAL_IN,
+		.priority = NF_IP_PRI_SELINUX_LAST + 1,
+	},
+#if IS_ENABLED(CONFIG_IPV6)
+	{
+		.hook     = rekernel_pkg_ipv4_ipv6_in,
+		.pf       = NFPROTO_IPV6,
+		.hooknum  = NF_INET_LOCAL_IN,
+		.priority = NF_IP6_PRI_SELINUX_LAST + 1,
+	}
+#endif
+};
+
+void unregister_netfilter(void)
+{
+	struct net *net;
+
+	rtnl_lock();
+	for_each_net(net) {
+		nf_unregister_net_hooks(net, rekernel_nf_ops, ARRAY_SIZE(rekernel_nf_ops));
+	}
+	rtnl_unlock();
+}
+
+int register_netfilter(void)
+{
+	int rc = LINE_SUCCESS;
+	struct net *net = NULL;
+
+	rtnl_lock();
+	for_each_net(net) {
+		rc = nf_register_net_hooks(net, rekernel_nf_ops, ARRAY_SIZE(rekernel_nf_ops));
+		if (rc != LINE_SUCCESS) {
+			pr_err("register netfilter hooks failed, rc=%d\n", rc);
+			break;
+		}
+	}
+	rtnl_unlock();
+
+	if (rc != LINE_SUCCESS) {
+		unregister_netfilter();
+		return LINE_ERROR;
+	}
+
+	return LINE_SUCCESS;
+}
+
+int __init rekernel_init(void)
+{
+	start_rekernel_server();
+	register_netfilter();
+	return 0;
+}
+
+void rekernel_exit(void)
+{
+
+}
+
+module_init(rekernel_init);
+module_exit(rekernel_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Nep-Timeline & AlexLiuDev233");
+MODULE_DESCRIPTION("Make tombstone users get a better experience.");

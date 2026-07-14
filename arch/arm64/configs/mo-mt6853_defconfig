@@ -2324,6 +2324,12 @@ CONFIG_WLAN_VENDOR_QUANTENNA=y
 # Enable WiMAX (Networking options) to see the WiMAX drivers
 #
 # CONFIG_WAN is not set
+
+#
+# Re:Kernel
+#
+CONFIG_REKERNEL=y
+# CONFIG_REKERNEL_DEBUG is not set
 # CONFIG_ISDN is not set
 
 #
