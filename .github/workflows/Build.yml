@@ -1,126 +1,451 @@
-name: MT6853-Kernel-A12  # 第一行改成了精简的英文项目名
+name: MT6853-Kernel-A12
+
 
 on:
+
   push:
     branches:
-      - kernel-main  # 只监听 kernel-main 分支推送
-  workflow_dispatch: # 保留手动运行
+      - kernel-main
+
+
   schedule:
-    - cron: '0 0 * * 5' # 每周五定时执行
-    
+    - cron: "0 0 * * 5"
+
+
+  workflow_dispatch:
+
+    inputs:
+
+      branch:
+
+        description: "请输入需要编译的内核分支"
+
+        required: true
+
+        default: "kernel-main"
+
+        type: string
+
+
+
+permissions:
+
+  contents: write
+
+
+
 jobs:
+
+
   build:
+
+
     runs-on: ubuntu-22.04
-    permissions:
-      contents: write
-      packages: read
+
+
 
     steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: kernel-main  # 固定检出当前配置仓库的 kernel-main 分支代码
 
-    - name: 构建编译内核环境
+
+    # ==========================
+    # Checkout
+    # ==========================
+
+    - name: Checkout kernel source
+
+      uses: actions/checkout@v4
+
+      with:
+
+        ref: ${{ github.event.inputs.branch || github.ref_name }}
+
+        fetch-depth: 10
+
+
+
+    # ==========================
+    # 环境
+    # ==========================
+
+    - name: Install dependencies
+
       run: |
-        sudo apt-get update
-        sudo -E apt-get -y -qq install git make bc bison ccache openssl dos2unix zip kmod cpio flex libelf-dev curl libssl-dev libtfm-dev wget device-tree-compiler ca-certificates python3 python2 binutils binutils-aarch64-linux-gnu binutils-arm-linux-gnueabi
+
+        sudo apt update
+
+
+        sudo apt install -y \
+        git \
+        make \
+        bc \
+        bison \
+        flex \
+        ccache \
+        openssl \
+        zip \
+        unzip \
+        kmod \
+        cpio \
+        libelf-dev \
+        libssl-dev \
+        libtfm-dev \
+        device-tree-compiler \
+        curl \
+        wget \
+        python3 \
+        python2 \
+        binutils \
+        binutils-aarch64-linux-gnu \
+        binutils-arm-linux-gnueabi
+
+
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
-    - name: 下载 Gcc编译器
+
+
+
+    # ==========================
+    # GCC 4.9
+    # ==========================
+
+    - name: Download GCC 4.9
+
+
       run: |
+
         cd $GITHUB_WORKSPACE/kernel_workspace
-        
+
+
+
         mkdir gcc64
-        wget -O gcc-aarch64.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
-        tar -C gcc64/ -zxvf gcc-aarch64.tar.gz
-    
+
+
+        wget -O gcc64.tar.gz \
+        https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
+
+
+        tar -xf gcc64.tar.gz -C gcc64
+
+
+
+
         mkdir gcc32
-        wget -O gcc-arm.tar.gz https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
-        tar -C gcc32/ -zxvf gcc-arm.tar.gz
-    
-    - name: 下载Clang编译器(NDK r24)
+
+
+        wget -O gcc32.tar.gz \
+        https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
+
+
+        tar -xf gcc32.tar.gz -C gcc32
+
+
+
+
+    # ==========================
+    # Clang
+    # ==========================
+
+    - name: Download Clang NDK r24
+
+
       run: |
+
+
         cd $GITHUB_WORKSPACE/kernel_workspace
-        mkdir -p clang-aosp
-        wget -q https://dl.google.com/android/repository/android-ndk-r24-linux.zip
+
+
+        wget -q \
+        https://dl.google.com/android/repository/android-ndk-r24-linux.zip
+
+
+
         unzip -q android-ndk-r24-linux.zip
-        mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64/* clang-aosp/
-        rm -rf android-ndk-r24 android-ndk-r24-linux.zip
-    
-    - name: 下载内核源码
-      run: |
-        cd $GITHUB_WORKSPACE/kernel_workspace
-        # 浅克隆最近 5 条历史，完美平衡“下载速度”与“更新日志获取”
-        git clone -b kernel-main --depth=5 https://github.com/momo54181/android_kernel_oplus_mt6853 android-kernel
 
-    - name: 更新 ReSukiSU
+
+
+        mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 clang-aosp
+
+
+
+        rm android-ndk-r24-linux.zip
+
+
+
+
+
+    # ==========================
+    # ReSukiSU
+    # ==========================
+
+    - name: Install ReSukiSU
+
+
       run: |
-        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        rm -rf KernelSU
-        curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
-               
-    - name: 设置ccache缓存
+
+
+        cd $GITHUB_WORKSPACE
+
+
+
+        rm -rf KernelSU || true
+
+
+
+        curl -LSs \
+        https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh \
+        | bash
+
+
+
+
+
+    # ==========================
+    # ccache
+    # ==========================
+
+    - name: Setup ccache
+
+
       uses: hendrikmuhs/ccache-action@v1.2
-      with:
-        key: build-kernel-mido-kernel
-        max-size: 2G
- 
-    - name: 开始编译内核
-      run: |
-        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
-        export PATH=$GITHUB_WORKSPACE/kernel_workspace/clang-aosp/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
-        make -s -j$(nproc --all) O=out ARCH=arm64 mo-mt6853_defconfig
-        make -j$(nproc --all) CC="ccache clang" O=out ARCH=arm64 CLANG_TRIPLE=aarch64-linux-gnu- CROSS_COMPILE=aarch64-linux-android- CROSS_COMPILE_ARM32=arm-linux-androideabi- LD=ld.lld
-                
-    - name: 制作Anykernel3卡刷包
-      run: |
-        cd $GITHUB_WORKSPACE/kernel_workspace
-        git clone https://github.com/momo54181/AnyKernel3
-        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' AnyKernel3/anykernel.sh
-        sed -i 's!block=/dev/block/platform/omap/omap_hsmmc.0/by-name/boot;!block=auto;!g' AnyKernel3/anykernel.sh
-        sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' AnyKernel3/anykernel.sh
-        cp android-kernel/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
-        rm -rf AnyKernel3/.git* AnyKernel3/README.md
-        zip -r mt6853-kernel-AnyKernel3.zip AnyKernel3/
-        ls -lh
-        
-    - name: 上传 Anykernel3
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-mt6853-kernel-Anykernel3
-        path: kernel_workspace/AnyKernel3/*
-        
-    - name: 上传编译内核
-      uses: actions/upload-artifact@v4
-      with:
-        name: Image.gz
-        path: kernel_workspace/android-kernel/out/arch/arm64/boot/Image.gz
 
-    # 核心新增：生成最近 5 条的更新日志
-    - name: 生成内核更新日志
-      id: changelog
+
+      with:
+
+        key: mt6853-kernel-${{ github.event.inputs.branch || github.ref_name }}
+
+        max-size: 2G
+
+
+
+
+
+
+    # ==========================
+    # 编译
+    # ==========================
+
+    - name: Build kernel
+
+
       run: |
-        cd $GITHUB_WORKSPACE/kernel_workspace/android-kernel
+
+
+        cd $GITHUB_WORKSPACE
+
+
+
+        export PATH=$GITHUB_WORKSPACE/kernel_workspace/clang-aosp/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
+
+
+
+        make \
+        -s \
+        O=out \
+        ARCH=arm64 \
+        mo-mt6853_defconfig
+
+
+
+
+        make \
+        -j$(nproc --all) \
+        O=out \
+        ARCH=arm64 \
+        CC="ccache clang" \
+        CLANG_TRIPLE=aarch64-linux-gnu- \
+        CROSS_COMPILE=aarch64-linux-android- \
+        CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+        LD=ld.lld
+
+
+
+
+
+
+    # ==========================
+    # AnyKernel3
+    # ==========================
+
+    - name: Build AnyKernel3
+
+
+      run: |
+
+
+        cd $GITHUB_WORKSPACE/kernel_workspace
+
+
+
+        git clone \
+        https://github.com/momo54181/AnyKernel3
+
+
+
+
+        sed -i \
+        's/do.devicecheck=1/do.devicecheck=0/g' \
+        AnyKernel3/anykernel.sh
+
+
+
+        sed -i \
+        's!block=.*;!block=auto;!g' \
+        AnyKernel3/anykernel.sh
+
+
+
+        sed -i \
+        's/is_slot_device=0;/is_slot_device=auto;/g' \
+        AnyKernel3/anykernel.sh
+
+
+
+
+        cp \
+        $GITHUB_WORKSPACE/out/arch/arm64/boot/Image.gz-dtb \
+        AnyKernel3/
+
+
+
+        rm -rf AnyKernel3/.git
+
+
+
+        zip -r \
+        MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip \
+        AnyKernel3
+
+
+
+
+
+
+    # ==========================
+    # Artifact
+    # ==========================
+
+    - name: Upload AnyKernel3
+
+
+      uses: actions/upload-artifact@v4
+
+
+      with:
+
+
+        name: MT6853-AnyKernel3
+
+
+        path: kernel_workspace/MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip
+
+
+
+
+
+    - name: Upload Image
+
+
+      uses: actions/upload-artifact@v4
+
+
+      with:
+
+
+        name: Image.gz-dtb
+
+
+        path: out/arch/arm64/boot/Image.gz-dtb
+
+
+
+
+
+
+    # ==========================
+    # Changelog
+    # ==========================
+
+    - name: Generate changelog
+
+
+      id: changelog
+
+
+      run: |
+
+
         echo "LOGS<<EOF" >> $GITHUB_OUTPUT
-        git log --oneline -n 5 >> $GITHUB_OUTPUT
+
+
+        git log --oneline -5 >> $GITHUB_OUTPUT
+
+
         echo "EOF" >> $GITHUB_OUTPUT
 
-    - name: 发布到 GitHub Release
-      uses: softprops/action-gh-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
+
+
+
+
+    # ==========================
+    # Release
+    # ==========================
+
+    - name: Create Release
+
+
+      uses: softprops/action-gh-release@v2
+
+
       with:
-        # 为了规范，Tag 加上前缀避免纯数字冲突
-        tag_name: Kernel-MT6853-${{ github.run_id }}
-        # 名字直接使用带 Build 序号的硬核规范命名
-        name: 🚀 MT6853 Kernel Release-A12 [Build #${{ github.run_number }}]
+
+
+        tag_name:
+
+          MT6853-${{ github.event.inputs.branch || github.ref_name }}-${{ github.run_id }}
+
+
+
+        name:
+
+          🚀 MT6853 ${{ github.event.inputs.branch || github.ref_name }} Kernel Build #${{ github.run_number }}
+
+
+
         body: |
-          自动编译 OPPO/Realme MT6853 安卓12 内核
-          - 编译工具：NDK r24 Clang + GCC 4.9
-          - 内置：ReSukiSU
-          
-          ### 📝 近期内核更新日志 (kernel-main)
+
+
+          ## MT6853 Android 12 Kernel
+
+
+          Branch:
+
+          `${{ github.event.inputs.branch || github.ref_name }}`
+
+
+          Compiler:
+
+          - Android NDK r24 Clang
+          - GCC 4.9
+
+
+          Features:
+
+          - ReSukiSU
+
+
+
+          ### Changelog
+
+
           ${{ steps.changelog.outputs.LOGS }}
+
+
+
         files: |
-          kernel_workspace/mt6853-kernel-AnyKernel3.zip
-          kernel_workspace/android-kernel/out/arch/arm64/boot/Image.gz
+
+
+          kernel_workspace/MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip
+
+          out/arch/arm64/boot/Image.gz-dtb
