@@ -310,7 +310,6 @@ drop:
 
 int udp_v4_early_demux(struct sk_buff *);
 int tcp_v4_early_demux(struct sk_buff *);
-
 static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 			      struct sk_buff *skb)
 {
@@ -318,14 +317,6 @@ static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 	struct net_device *dev = skb->dev;
 	struct rtable *rt;
 	int err;
-
-	/*
-	 * if ingress device is enslaved to an L3 master device pass the
-	 * skb to its handler for processing
-	 */
-	skb = l3mdev_ip_rcv(skb);
-	if (!skb)
-		return NET_RX_SUCCESS;
 
 	if (READ_ONCE(net->ipv4.sysctl_ip_early_demux) &&
 	    !skb_dst(skb) &&
@@ -340,7 +331,6 @@ static int ip_rcv_finish_core(struct net *net, struct sock *sk,
 				iph = ip_hdr(skb);
 			}
 			break;
-
 		case IPPROTO_UDP:
 			if (READ_ONCE(net->ipv4.sysctl_udp_early_demux)) {
 				err = udp_v4_early_demux(skb);
@@ -639,4 +629,3 @@ void ip_list_rcv(struct list_head *head, struct packet_type *pt,
 	/* dispatch final sublist */
 	ip_sublist_rcv(&sublist, curr_dev, curr_net);
 }
-

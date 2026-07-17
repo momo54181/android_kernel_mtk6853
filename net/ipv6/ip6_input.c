@@ -49,15 +49,9 @@
 
 void udp_v6_early_demux(struct sk_buff *);
 void tcp_v6_early_demux(struct sk_buff *);
-int ip6_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
+static void ip6_rcv_finish_core(struct net *net, struct sock *sk,
+				struct sk_buff *skb)
 {
-	/* if ingress device is enslaved to an L3 master device pass the
-	 * skb to its handler for processing
-	 */
-	skb = l3mdev_ip6_rcv(skb);
-	if (!skb)
-		return NET_RX_SUCCESS;
-
 	if (READ_ONCE(net->ipv4.sysctl_ip_early_demux) &&
 	    !skb_dst(skb) && !skb->sk) {
 		switch (ipv6_hdr(skb)->nexthdr) {

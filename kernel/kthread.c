@@ -1,3 +1,11 @@
+#ifndef trace_sched_kthread_work_execute_start
+#define trace_sched_kthread_work_execute_start(work) do { } while (0)
+#endif
+
+#ifndef trace_sched_kthread_work_execute_end
+#define trace_sched_kthread_work_execute_end(work, func) do { } while (0)
+#endif
+
 /* Kernel thread helper functions.
  *   Copyright (C) 2004 IBM Corporation, Rusty Russell.
  *

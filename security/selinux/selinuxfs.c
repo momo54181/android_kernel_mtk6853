@@ -533,6 +533,7 @@ static ssize_t sel_write_load(struct file *file, const char __user *buf,
 
 {
 	struct selinux_fs_info *fsi = file_inode(file)->i_sb->s_fs_info;
+	static DEFINE_MUTEX(sel_mutex);
 	ssize_t length;
 	void *data = NULL;
 
