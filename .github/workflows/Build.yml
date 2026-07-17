@@ -21,7 +21,7 @@ on:
 
       branch:
 
-        description: "请输入需要编译的内核分支"
+        description: "Kernel branch to build"
 
         required: true
 
@@ -145,7 +145,7 @@ jobs:
 
 
     # ======================
-    # clang14 NDK r24
+    # clang14
     # ======================
 
     - name: Cache clang14
@@ -173,14 +173,18 @@ jobs:
         cd $GITHUB_WORKSPACE/kernel_workspace
 
 
+
         wget -q \
         https://dl.google.com/android/repository/android-ndk-r24-linux.zip
+
 
 
         unzip -q android-ndk-r24-linux.zip
 
 
+
         mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 clang14
+
 
 
         rm android-ndk-r24-linux.zip
@@ -190,7 +194,7 @@ jobs:
 
 
     # ======================
-    # clang11 crDroid
+    # clang11
     # ======================
 
     - name: Cache clang11
@@ -218,6 +222,7 @@ jobs:
         cd $GITHUB_WORKSPACE/kernel_workspace
 
 
+
         git clone \
         --depth=1 \
         https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-6443078 \
@@ -227,9 +232,8 @@ jobs:
 
 
 
-
     # ======================
-    # 自动选择 clang
+    # Select clang
     # ======================
 
     - name: Select clang
@@ -242,6 +246,7 @@ jobs:
 
 
         BRANCH="${{ github.event.inputs.branch || github.ref_name }}"
+
 
 
         if [[ "$BRANCH" == *"vanilla"* ]]; then
@@ -265,17 +270,19 @@ jobs:
 
 
 
-    - name: Check clang
+
+
+    - name: Check compiler
 
       run: |
 
         export PATH=${{ steps.clang.outputs.path }}:$PATH
 
 
-        which clang
-
-
         clang --version
+
+
+        which clang
 
 
 
@@ -288,8 +295,6 @@ jobs:
     - name: Install ReSukiSU
 
       run: |
-
-        rm -rf KernelSU || true
 
 
         curl -LSs \
@@ -312,7 +317,9 @@ jobs:
 
       with:
 
+
         key: mt6853-${{ github.event.inputs.branch || github.ref_name }}
+
 
         max-size: 2G
 
@@ -327,10 +334,19 @@ jobs:
 
     - name: Build kernel
 
+
+      shell: bash
+
+
       run: |
 
 
         export PATH=${{ steps.clang.outputs.path }}:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
+
+
+
+        echo "Compiler:"
+        clang --version
 
 
 
@@ -344,16 +360,15 @@ jobs:
 
 
         make \
-        -j$(nproc --all) \
+        -j2 \
         O=out \
         ARCH=arm64 \
-        CC="ccache clang" \
-        LLVM_IAS=1 \
+        CC="clang" \
+        LLVM_IAS=0 \
         CLANG_TRIPLE=aarch64-linux-gnu- \
         CROSS_COMPILE=aarch64-linux-android- \
         CROSS_COMPILE_ARM32=arm-linux-androideabi- \
         LD=ld.lld
-
 
 
 
@@ -364,6 +379,7 @@ jobs:
     # ======================
 
     - name: Build AnyKernel3
+
 
       run: |
 
@@ -406,7 +422,6 @@ jobs:
 
 
 
-
     # ======================
     # Upload
     # ======================
@@ -424,6 +439,7 @@ jobs:
 
 
         path: kernel_workspace/MT6853-*-AnyKernel3.zip
+
 
 
 
@@ -459,12 +475,18 @@ jobs:
 
           Branch:
 
-          `${{ github.event.inputs.branch || github.ref_name }}`
+          ${{ github.event.inputs.branch || github.ref_name }}
 
 
           Compiler:
 
-          `${{ steps.clang.outputs.version }}`
+          ${{ steps.clang.outputs.version }}
+
+
+          LLVM_IAS:
+
+          disabled
+
 
 
         files: |
