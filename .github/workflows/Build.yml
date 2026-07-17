@@ -4,11 +4,14 @@ name: MT6853-Kernel-A12
 on:
 
   push:
+
     branches:
+
       - kernel-main
 
 
   schedule:
+
     - cron: "0 0 * * 5"
 
 
@@ -51,7 +54,7 @@ jobs:
     # Checkout
     # ======================
 
-    - name: Checkout source
+    - name: Checkout kernel source
 
       uses: actions/checkout@v4
 
@@ -64,10 +67,10 @@ jobs:
 
 
     # ======================
-    # Environment
+    # Dependencies
     # ======================
 
-    - name: Install packages
+    - name: Install dependencies
 
       run: |
 
@@ -94,8 +97,6 @@ jobs:
         wget \
         python3 \
         python2 \
-        cmake \
-        ninja-build \
         binutils \
         binutils-aarch64-linux-gnu \
         binutils-arm-linux-gnueabi
@@ -107,8 +108,9 @@ jobs:
 
 
 
+
     # ======================
-    # GCC
+    # GCC 4.9
     # ======================
 
     - name: Download GCC 4.9
@@ -143,23 +145,18 @@ jobs:
 
 
     # ======================
-    # clang14
+    # clang14 NDK r24
     # ======================
 
     - name: Cache clang14
 
-
       id: clang14-cache
-
 
       uses: actions/cache@v4
 
-
       with:
 
-
         path: kernel_workspace/clang14
-
 
         key: clang14-ndk-r24
 
@@ -169,28 +166,21 @@ jobs:
 
     - name: Install clang14
 
-
       if: steps.clang14-cache.outputs.cache-hit != 'true'
-
 
       run: |
 
-
         cd $GITHUB_WORKSPACE/kernel_workspace
-
 
 
         wget -q \
         https://dl.google.com/android/repository/android-ndk-r24-linux.zip
 
 
-
         unzip -q android-ndk-r24-linux.zip
 
 
-
         mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 clang14
-
 
 
         rm android-ndk-r24-linux.zip
@@ -199,27 +189,21 @@ jobs:
 
 
 
-
     # ======================
-    # clang11
+    # clang11 crDroid
     # ======================
 
     - name: Cache clang11
 
-
       id: clang11-cache
-
 
       uses: actions/cache@v4
 
-
       with:
-
 
         path: kernel_workspace/clang11
 
-
-        key: clang11-llvm-11.0.1
+        key: clang11-crdroid-6443078
 
 
 
@@ -227,37 +211,17 @@ jobs:
 
     - name: Install clang11
 
-
       if: steps.clang11-cache.outputs.cache-hit != 'true'
 
-
       run: |
-
 
         cd $GITHUB_WORKSPACE/kernel_workspace
 
 
-
-        wget -q \
-        https://github.com/ClangBuiltLinux/llvm-project/releases/download/llvmorg-11.0.1/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04.tar.xz
-
-
-
-        mkdir clang11-temp
-
-
-
-        tar -xf clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04.tar.xz \
-        -C clang11-temp \
-        --strip-components=1
-
-
-
-        mv clang11-temp clang11
-
-
-
-        rm clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+        git clone \
+        --depth=1 \
+        https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-6443078 \
+        clang11
 
 
 
@@ -268,20 +232,16 @@ jobs:
     # 自动选择 clang
     # ======================
 
-    - name: Select clang version
-
+    - name: Select clang
 
       id: clang
 
-
       shell: bash
-
 
       run: |
 
 
         BRANCH="${{ github.event.inputs.branch || github.ref_name }}"
-
 
 
         if [[ "$BRANCH" == *"vanilla"* ]]; then
@@ -305,6 +265,21 @@ jobs:
 
 
 
+    - name: Check clang
+
+      run: |
+
+        export PATH=${{ steps.clang.outputs.path }}:$PATH
+
+
+        which clang
+
+
+        clang --version
+
+
+
+
 
     # ======================
     # ReSukiSU
@@ -312,12 +287,9 @@ jobs:
 
     - name: Install ReSukiSU
 
-
       run: |
 
-
         rm -rf KernelSU || true
-
 
 
         curl -LSs \
@@ -340,9 +312,7 @@ jobs:
 
       with:
 
-
         key: mt6853-${{ github.event.inputs.branch || github.ref_name }}
-
 
         max-size: 2G
 
@@ -350,22 +320,17 @@ jobs:
 
 
 
+
     # ======================
-    # Build
+    # Build kernel
     # ======================
 
     - name: Build kernel
-
 
       run: |
 
 
         export PATH=${{ steps.clang.outputs.path }}:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
-
-
-
-        echo "Using clang:"
-        clang --version
 
 
 
@@ -399,7 +364,6 @@ jobs:
     # ======================
 
     - name: Build AnyKernel3
-
 
       run: |
 
@@ -456,7 +420,7 @@ jobs:
       with:
 
 
-        name: AnyKernel3
+        name: MT6853-AnyKernel3
 
 
         path: kernel_workspace/MT6853-*-AnyKernel3.zip
@@ -480,7 +444,7 @@ jobs:
 
         tag_name:
 
-          MT6853-${{ github.run_id }}
+          MT6853-${{ github.event.inputs.branch || github.ref_name }}-${{ github.run_id }}
 
 
 
@@ -495,13 +459,12 @@ jobs:
 
           Branch:
 
-          ${{ github.event.inputs.branch || github.ref_name }}
+          `${{ github.event.inputs.branch || github.ref_name }}`
 
 
           Compiler:
 
-          ${{ steps.clang.outputs.version }}
-
+          `${{ steps.clang.outputs.version }}`
 
 
         files: |
