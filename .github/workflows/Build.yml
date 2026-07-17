@@ -47,11 +47,11 @@ jobs:
     steps:
 
 
-    # ==========================
+    # ======================
     # Checkout
-    # ==========================
+    # ======================
 
-    - name: Checkout kernel source
+    - name: Checkout source
 
       uses: actions/checkout@v4
 
@@ -63,11 +63,11 @@ jobs:
 
 
 
-    # ==========================
-    # 环境
-    # ==========================
+    # ======================
+    # Environment
+    # ======================
 
-    - name: Install dependencies
+    - name: Install packages
 
       run: |
 
@@ -94,9 +94,12 @@ jobs:
         wget \
         python3 \
         python2 \
+        cmake \
+        ninja-build \
         binutils \
         binutils-aarch64-linux-gnu \
         binutils-arm-linux-gnueabi
+
 
 
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
@@ -104,23 +107,21 @@ jobs:
 
 
 
-    # ==========================
-    # GCC 4.9
-    # ==========================
+    # ======================
+    # GCC
+    # ======================
 
     - name: Download GCC 4.9
-
 
       run: |
 
         cd $GITHUB_WORKSPACE/kernel_workspace
 
 
-
         mkdir gcc64
 
 
-        wget -O gcc64.tar.gz \
+        wget -q -O gcc64.tar.gz \
         https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
 
 
@@ -128,11 +129,10 @@ jobs:
 
 
 
-
         mkdir gcc32
 
 
-        wget -O gcc32.tar.gz \
+        wget -q -O gcc32.tar.gz \
         https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
 
 
@@ -141,17 +141,43 @@ jobs:
 
 
 
-    # ==========================
-    # Clang
-    # ==========================
 
-    - name: Download Clang NDK r24
+    # ======================
+    # clang14
+    # ======================
+
+    - name: Cache clang14
+
+
+      id: clang14-cache
+
+
+      uses: actions/cache@v4
+
+
+      with:
+
+
+        path: kernel_workspace/clang14
+
+
+        key: clang14-ndk-r24
+
+
+
+
+
+    - name: Install clang14
+
+
+      if: steps.clang14-cache.outputs.cache-hit != 'true'
 
 
       run: |
 
 
         cd $GITHUB_WORKSPACE/kernel_workspace
+
 
 
         wget -q \
@@ -163,7 +189,7 @@ jobs:
 
 
 
-        mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 clang-aosp
+        mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 clang14
 
 
 
@@ -173,18 +199,121 @@ jobs:
 
 
 
-    # ==========================
-    # ReSukiSU
-    # ==========================
 
-    - name: Install ReSukiSU
+    # ======================
+    # clang11
+    # ======================
+
+    - name: Cache clang11
+
+
+      id: clang11-cache
+
+
+      uses: actions/cache@v4
+
+
+      with:
+
+
+        path: kernel_workspace/clang11
+
+
+        key: clang11-llvm-11.0.1
+
+
+
+
+
+    - name: Install clang11
+
+
+      if: steps.clang11-cache.outputs.cache-hit != 'true'
 
 
       run: |
 
 
-        cd $GITHUB_WORKSPACE
+        cd $GITHUB_WORKSPACE/kernel_workspace
 
+
+
+        wget -q \
+        https://github.com/ClangBuiltLinux/llvm-project/releases/download/llvmorg-11.0.1/clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+
+
+
+        mkdir clang11-temp
+
+
+
+        tar -xf clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04.tar.xz \
+        -C clang11-temp \
+        --strip-components=1
+
+
+
+        mv clang11-temp clang11
+
+
+
+        rm clang+llvm-11.0.1-x86_64-linux-gnu-ubuntu-20.04.tar.xz
+
+
+
+
+
+
+    # ======================
+    # 自动选择 clang
+    # ======================
+
+    - name: Select clang version
+
+
+      id: clang
+
+
+      shell: bash
+
+
+      run: |
+
+
+        BRANCH="${{ github.event.inputs.branch || github.ref_name }}"
+
+
+
+        if [[ "$BRANCH" == *"vanilla"* ]]; then
+
+
+          echo "version=clang11" >> $GITHUB_OUTPUT
+
+          echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang11/bin" >> $GITHUB_OUTPUT
+
+
+        else
+
+
+          echo "version=clang14" >> $GITHUB_OUTPUT
+
+          echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang14/bin" >> $GITHUB_OUTPUT
+
+
+        fi
+
+
+
+
+
+    # ======================
+    # ReSukiSU
+    # ======================
+
+    - name: Install ReSukiSU
+
+
+      run: |
 
 
         rm -rf KernelSU || true
@@ -199,9 +328,9 @@ jobs:
 
 
 
-    # ==========================
+    # ======================
     # ccache
-    # ==========================
+    # ======================
 
     - name: Setup ccache
 
@@ -211,7 +340,9 @@ jobs:
 
       with:
 
-        key: mt6853-kernel-${{ github.event.inputs.branch || github.ref_name }}
+
+        key: mt6853-${{ github.event.inputs.branch || github.ref_name }}
+
 
         max-size: 2G
 
@@ -219,10 +350,9 @@ jobs:
 
 
 
-
-    # ==========================
-    # 编译
-    # ==========================
+    # ======================
+    # Build
+    # ======================
 
     - name: Build kernel
 
@@ -230,11 +360,12 @@ jobs:
       run: |
 
 
-        cd $GITHUB_WORKSPACE
+        export PATH=${{ steps.clang.outputs.path }}:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
 
 
 
-        export PATH=$GITHUB_WORKSPACE/kernel_workspace/clang-aosp/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
+        echo "Using clang:"
+        clang --version
 
 
 
@@ -252,6 +383,7 @@ jobs:
         O=out \
         ARCH=arm64 \
         CC="ccache clang" \
+        LLVM_IAS=1 \
         CLANG_TRIPLE=aarch64-linux-gnu- \
         CROSS_COMPILE=aarch64-linux-android- \
         CROSS_COMPILE_ARM32=arm-linux-androideabi- \
@@ -262,9 +394,9 @@ jobs:
 
 
 
-    # ==========================
+    # ======================
     # AnyKernel3
-    # ==========================
+    # ======================
 
     - name: Build AnyKernel3
 
@@ -281,33 +413,24 @@ jobs:
 
 
 
-
-        sed -i \
-        's/do.devicecheck=1/do.devicecheck=0/g' \
+        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' \
         AnyKernel3/anykernel.sh
 
 
 
-        sed -i \
-        's!block=.*;!block=auto;!g' \
+        sed -i 's!block=.*;!block=auto;!g' \
         AnyKernel3/anykernel.sh
 
 
 
-        sed -i \
-        's/is_slot_device=0;/is_slot_device=auto;/g' \
+        sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' \
         AnyKernel3/anykernel.sh
-
 
 
 
         cp \
         $GITHUB_WORKSPACE/out/arch/arm64/boot/Image.gz-dtb \
         AnyKernel3/
-
-
-
-        rm -rf AnyKernel3/.git
 
 
 
@@ -320,9 +443,9 @@ jobs:
 
 
 
-    # ==========================
-    # Artifact
-    # ==========================
+    # ======================
+    # Upload
+    # ======================
 
     - name: Upload AnyKernel3
 
@@ -333,66 +456,20 @@ jobs:
       with:
 
 
-        name: MT6853-AnyKernel3
+        name: AnyKernel3
 
 
-        path: kernel_workspace/MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip
-
-
-
-
-
-    - name: Upload Image
-
-
-      uses: actions/upload-artifact@v4
-
-
-      with:
-
-
-        name: Image.gz-dtb
-
-
-        path: out/arch/arm64/boot/Image.gz-dtb
+        path: kernel_workspace/MT6853-*-AnyKernel3.zip
 
 
 
 
 
-
-    # ==========================
-    # Changelog
-    # ==========================
-
-    - name: Generate changelog
-
-
-      id: changelog
-
-
-      run: |
-
-
-        echo "LOGS<<EOF" >> $GITHUB_OUTPUT
-
-
-        git log --oneline -5 >> $GITHUB_OUTPUT
-
-
-        echo "EOF" >> $GITHUB_OUTPUT
-
-
-
-
-
-
-
-    # ==========================
+    # ======================
     # Release
-    # ==========================
+    # ======================
 
-    - name: Create Release
+    - name: Release
 
 
       uses: softprops/action-gh-release@v2
@@ -403,49 +480,33 @@ jobs:
 
         tag_name:
 
-          MT6853-${{ github.event.inputs.branch || github.ref_name }}-${{ github.run_id }}
+          MT6853-${{ github.run_id }}
 
 
 
         name:
 
-          🚀 MT6853 ${{ github.event.inputs.branch || github.ref_name }} Kernel Build #${{ github.run_number }}
+          🚀 MT6853 ${{ github.event.inputs.branch || github.ref_name }} ${{ steps.clang.outputs.version }}
 
 
 
         body: |
 
 
-          ## MT6853 Android 12 Kernel
-
-
           Branch:
 
-          `${{ github.event.inputs.branch || github.ref_name }}`
+          ${{ github.event.inputs.branch || github.ref_name }}
 
 
           Compiler:
 
-          - Android NDK r24 Clang
-          - GCC 4.9
-
-
-          Features:
-
-          - ReSukiSU
-
-
-
-          ### Changelog
-
-
-          ${{ steps.changelog.outputs.LOGS }}
+          ${{ steps.clang.outputs.version }}
 
 
 
         files: |
 
 
-          kernel_workspace/MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip
+          kernel_workspace/MT6853-*-AnyKernel3.zip
 
           out/arch/arm64/boot/Image.gz-dtb
