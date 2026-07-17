@@ -333,51 +333,79 @@ jobs:
 
 
 
-
     # ==========================
-    # AnyKernel3
+    # Build AnyKernel3
     # ==========================
 
     - name: Build AnyKernel3
 
-      run: |
+      shell: bash
 
+      run: |
 
         cd $GITHUB_WORKSPACE/kernel_workspace
 
 
         git clone \
+        --depth=1 \
         https://github.com/momo54181/AnyKernel3
 
 
 
+        cd AnyKernel3
+
+
+
+        # Disable device check
+
         sed -i \
         's/do.devicecheck=1/do.devicecheck=0/g' \
-        AnyKernel3/anykernel.sh
+        anykernel.sh
 
 
+
+        # Auto slot detection
 
         sed -i \
         's/is_slot_device=0;/is_slot_device=auto;/g' \
-        AnyKernel3/anykernel.sh
+        anykernel.sh
 
 
+
+        # Copy kernel image
 
         cp \
-        out/arch/arm64/boot/Image.gz-dtb \
-        AnyKernel3/
+        $GITHUB_WORKSPACE/out/arch/arm64/boot/Image.gz-dtb \
+        ./
 
 
+
+        # Remove unnecessary files
+
+        rm -rf .git
+
+        rm -f README.md
+
+
+
+        # Create flashable zip
+        # Zip contents directly, no AnyKernel3 directory
 
         zip -r \
-        MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip \
-        AnyKernel3
+        ../MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip \
+        .
+
+
+
+        cd ..
+
+        ls -lh MT6853-*-AnyKernel3.zip
 
 
 
 
     # ==========================
-    # Upload Artifact
+    # Upload AnyKernel3
     # ==========================
 
     - name: Upload AnyKernel3
@@ -389,8 +417,6 @@ jobs:
         name: MT6853-AnyKernel3
 
         path: kernel_workspace/MT6853-*-AnyKernel3.zip
-
-
 
 
     # ==========================
