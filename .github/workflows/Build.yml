@@ -1,460 +1,257 @@
 name: MT6853-Kernel-A12
 
-
 on:
   push:
     branches:
       - kernel-main
-
   workflow_dispatch:
     inputs:
       branch:
         description: "Select kernel branch"
         required: true
         default: "kernel-main"
-
   schedule:
     - cron: "0 0 * * 5"
-
 
 permissions:
   contents: write
 
-
-
 jobs:
-
   build:
-
     runs-on: ubuntu-22.04
 
-
     steps:
-
-
     # ==========================
     # Checkout
     # ==========================
-
     - name: Checkout kernel source
-
       uses: actions/checkout@v4
-
       with:
-
         ref: ${{ github.event.inputs.branch || github.ref_name }}
-
         fetch-depth: 10
-
-
 
     # ==========================
     # Dependencies
     # ==========================
-
     - name: Install dependencies
-
       run: |
-
         sudo apt update
-
-
         sudo apt install -y \
-        git \
-        make \
-        bc \
-        bison \
-        flex \
-        ccache \
-        openssl \
-        zip \
-        unzip \
-        kmod \
-        cpio \
-        libelf-dev \
-        libssl-dev \
-        libtfm-dev \
-        device-tree-compiler \
-        curl \
-        wget \
-        python3 \
-        python2 \
-        binutils \
-        binutils-aarch64-linux-gnu \
-        binutils-arm-linux-gnueabi
-
-
+          git \
+          make \
+          bc \
+          bison \
+          flex \
+          ccache \
+          openssl \
+          zip \
+          unzip \
+          kmod \
+          cpio \
+          libelf-dev \
+          libssl-dev \
+          libtfm-dev \
+          device-tree-compiler \
+          curl \
+          wget \
+          python3 \
+          python2 \
+          binutils \
+          binutils-aarch64-linux-gnu \
+          binutils-arm-linux-gnueabi
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
-
-
     # ==========================
-    # Swap
+    # Swap (修复版)
     # ==========================
-
     - name: Setup swap
-
       run: |
-
-        sudo fallocate -l 8G /swapfile
-
+        # 关闭所有正在使用的 swap
+        sudo swapoff -a || true
+        
+        # 删除旧的 swapfile
+        sudo rm -f /swapfile
+        
+        # 创建 8G swapfile (fallocate 失败则用 dd)
+        sudo fallocate -l 8G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=8192 status=progress
+        
+        # 设置权限
         sudo chmod 600 /swapfile
-
+        
+        # 格式化为 swap
         sudo mkswap /swapfile
-
+        
+        # 启用 swap
         sudo swapon /swapfile
-
+        
+        # 显示内存状态
         free -h
 
-
-
     # ==========================
-    # GCC
+    # GCC 4.9
     # ==========================
-
     - name: Download GCC 4.9
-
       run: |
-
         cd $GITHUB_WORKSPACE/kernel_workspace
-
-
-        mkdir gcc64
-
-
+        
+        mkdir -p gcc64
         wget -q -O gcc64.tar.gz \
-        https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
-
-
+          https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
         tar -xf gcc64.tar.gz -C gcc64
-
-
-
-        mkdir gcc32
-
-
+        
+        mkdir -p gcc32
         wget -q -O gcc32.tar.gz \
-        https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
-
-
+          https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/arm/arm-linux-androideabi-4.9/+archive/refs/tags/android-12.1.0_r27.tar.gz
         tar -xf gcc32.tar.gz -C gcc32
-
-
-
-
 
     # ==========================
     # Clang14
     # ==========================
-
     - name: Cache clang14
-
       uses: actions/cache@v4
-
       with:
-
         path: kernel_workspace/clang14
-
         key: clang14-ndk-r24
 
-
-
     - name: Download clang14
-
       run: |
-
         if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang14" ]; then
           exit 0
         fi
-
-
+        
         cd $GITHUB_WORKSPACE/kernel_workspace
-
-
-        wget -q \
-        https://dl.google.com/android/repository/android-ndk-r24-linux.zip
-
-
+        wget -q https://dl.google.com/android/repository/android-ndk-r24-linux.zip
         unzip -q android-ndk-r24-linux.zip
-
-
         mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 clang14
-
-
         rm android-ndk-r24-linux.zip
-
-
-
-
 
     # ==========================
     # Clang11
     # ==========================
-
     - name: Cache clang11
-
       uses: actions/cache@v4
-
       with:
-
         path: kernel_workspace/clang11
-
         key: clang11-crdroid-6443078
 
-
-
     - name: Download clang11
-
       run: |
-
         if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang11" ]; then
           exit 0
         fi
-
-
+        
         cd $GITHUB_WORKSPACE/kernel_workspace
-
-
-        git clone \
-        --depth=1 \
-        https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-6443078 \
-        clang11
-
-
-
-
+        git clone --depth=1 \
+          https://github.com/crdroidandroid/android_prebuilts_clang_host_linux-x86_clang-6443078 \
+          clang11
 
     # ==========================
-    # Select clang
+    # Select compiler
     # ==========================
-
     - name: Select compiler
-
       id: compiler
-
       shell: bash
-
       run: |
-
-
         BRANCH="${{ github.event.inputs.branch || github.ref_name }}"
-
-
+        
         if [[ "$BRANCH" == *"vanilla"* ]]; then
-
-
           echo "clang=clang11" >> $GITHUB_OUTPUT
-
           echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang11/bin" >> $GITHUB_OUTPUT
-
-
         else
-
-
           echo "clang=clang14" >> $GITHUB_OUTPUT
-
           echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang14/bin" >> $GITHUB_OUTPUT
-
-
         fi
 
-
-
-
     - name: Check compiler
-
       run: |
-
         export PATH=${{ steps.compiler.outputs.path }}:$PATH
-
-
         clang --version
-
-
 
     # ==========================
     # Install ReSukiSU
     # ==========================
-
     - name: Setup ReSukiSU
-
       run: |
-
         cd $GITHUB_WORKSPACE
-
-
         curl -LSs \
-        https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh \
-        | bash
-
-
-
-
+          https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh \
+          | bash
 
     # ==========================
     # Build Kernel
     # ==========================
-
     - name: Build kernel
-
       shell: bash
-
       run: |
-
-
         export PATH=${{ steps.compiler.outputs.path }}:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
-
-
-
+        
         echo "Using compiler:"
-
         clang --version
-
-
-
-        make \
-        -s \
-        O=out \
-        ARCH=arm64 \
-        mo-mt6853_defconfig
-
-
-
-        make \
-        -j$(nproc --all) \
-        O=out \
-        ARCH=arm64 \
-        CC=clang \
-        LLVM_IAS=0 \
-        CLANG_TRIPLE=aarch64-linux-gnu- \
-        CROSS_COMPILE=aarch64-linux-android- \
-        CROSS_COMPILE_ARM32=arm-linux-androideabi- \
-        LD=ld.lld
-
-
+        
+        make -s O=out ARCH=arm64 mo-mt6853_defconfig
+        
+        make -j$(nproc --all) \
+          O=out \
+          ARCH=arm64 \
+          CC=clang \
+          LLVM_IAS=0 \
+          CLANG_TRIPLE=aarch64-linux-gnu- \
+          CROSS_COMPILE=aarch64-linux-android- \
+          CROSS_COMPILE_ARM32=arm-linux-androideabi- \
+          LD=ld.lld
 
     # ==========================
     # Build AnyKernel3
     # ==========================
-
     - name: Build AnyKernel3
-
       shell: bash
-
       run: |
-
         cd $GITHUB_WORKSPACE/kernel_workspace
-
-
-        git clone \
-        --depth=1 \
-        https://github.com/momo54181/AnyKernel3
-
-
-
+        
+        git clone --depth=1 \
+          https://github.com/momo54181/AnyKernel3
+        
         cd AnyKernel3
-
-
-
+        
         # Disable device check
-
-        sed -i \
-        's/do.devicecheck=1/do.devicecheck=0/g' \
-        anykernel.sh
-
-
-
+        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' anykernel.sh
+        
         # Auto slot detection
-
-        sed -i \
-        's/is_slot_device=0;/is_slot_device=auto;/g' \
-        anykernel.sh
-
-
-
+        sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' anykernel.sh
+        
         # Copy kernel image
-
-        cp \
-        $GITHUB_WORKSPACE/out/arch/arm64/boot/Image.gz-dtb \
-        ./
-
-
-
+        cp $GITHUB_WORKSPACE/out/arch/arm64/boot/Image.gz-dtb ./
+        
         # Remove unnecessary files
-
-        rm -rf .git
-
-        rm -f README.md
-
-
-
+        rm -rf .git README.md
+        
         # Create flashable zip
-        # Zip contents directly, no AnyKernel3 directory
-
-        zip -r \
-        ../MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip \
-        .
-
-
-
+        zip -r ../MT6853-${{ github.event.inputs.branch || github.ref_name }}-AnyKernel3.zip .
+        
         cd ..
-
         ls -lh MT6853-*-AnyKernel3.zip
-
-
-
 
     # ==========================
     # Upload AnyKernel3
     # ==========================
-
     - name: Upload AnyKernel3
-
       uses: actions/upload-artifact@v4
-
       with:
-
         name: MT6853-AnyKernel3
-
         path: kernel_workspace/MT6853-*-AnyKernel3.zip
-
 
     # ==========================
     # Release
     # ==========================
-
     - name: Release
-
       uses: softprops/action-gh-release@v2
-
       with:
-
-        tag_name:
-
-          MT6853-${{ github.event.inputs.branch || github.ref_name }}-${{ github.run_id }}
-
-
-        name:
-
-          MT6853 Kernel ${{ github.event.inputs.branch || github.ref_name }}
-
-
+        tag_name: MT6853-${{ github.event.inputs.branch || github.ref_name }}-${{ github.run_id }}
+        name: MT6853 Kernel ${{ github.event.inputs.branch || github.ref_name }}
         body: |
-
-          Branch:
-          ${{ github.event.inputs.branch || github.ref_name }}
-
-
-          Compiler:
-          ${{ steps.compiler.outputs.clang }}
-
-
-          LLVM_IAS:
-          disabled
-
-
+          Branch: ${{ github.event.inputs.branch || github.ref_name }}
+          Compiler: ${{ steps.compiler.outputs.clang }}
+          LLVM_IAS: disabled
         files: |
-
           kernel_workspace/MT6853-*-AnyKernel3.zip
-
           out/arch/arm64/boot/Image.gz-dtb
