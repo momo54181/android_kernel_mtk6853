@@ -2,57 +2,39 @@ name: MT6853-Kernel-A12
 
 
 on:
-
   push:
-
     branches:
-
       - kernel-main
 
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Select kernel branch"
+        required: true
+        default: "kernel-main"
 
   schedule:
-
     - cron: "0 0 * * 5"
 
 
-  workflow_dispatch:
-
-    inputs:
-
-      branch:
-
-        description: "Kernel branch to build"
-
-        required: true
-
-        default: "kernel-main"
-
-        type: string
-
-
-
 permissions:
-
   contents: write
 
 
 
 jobs:
 
-
   build:
 
-
     runs-on: ubuntu-22.04
-
 
 
     steps:
 
 
-    # ======================
+    # ==========================
     # Checkout
-    # ======================
+    # ==========================
 
     - name: Checkout kernel source
 
@@ -66,9 +48,9 @@ jobs:
 
 
 
-    # ======================
+    # ==========================
     # Dependencies
-    # ======================
+    # ==========================
 
     - name: Install dependencies
 
@@ -102,16 +84,33 @@ jobs:
         binutils-arm-linux-gnueabi
 
 
-
         mkdir -p $GITHUB_WORKSPACE/kernel_workspace
 
 
 
+    # ==========================
+    # Swap
+    # ==========================
+
+    - name: Setup swap
+
+      run: |
+
+        sudo fallocate -l 8G /swapfile
+
+        sudo chmod 600 /swapfile
+
+        sudo mkswap /swapfile
+
+        sudo swapon /swapfile
+
+        free -h
 
 
-    # ======================
-    # GCC 4.9
-    # ======================
+
+    # ==========================
+    # GCC
+    # ==========================
 
     - name: Download GCC 4.9
 
@@ -144,13 +143,11 @@ jobs:
 
 
 
-    # ======================
-    # clang14
-    # ======================
+    # ==========================
+    # Clang14
+    # ==========================
 
     - name: Cache clang14
-
-      id: clang14-cache
 
       uses: actions/cache@v4
 
@@ -162,29 +159,26 @@ jobs:
 
 
 
-
-
-    - name: Install clang14
-
-      if: steps.clang14-cache.outputs.cache-hit != 'true'
+    - name: Download clang14
 
       run: |
 
-        cd $GITHUB_WORKSPACE/kernel_workspace
+        if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang14" ]; then
+          exit 0
+        fi
 
+
+        cd $GITHUB_WORKSPACE/kernel_workspace
 
 
         wget -q \
         https://dl.google.com/android/repository/android-ndk-r24-linux.zip
 
 
-
         unzip -q android-ndk-r24-linux.zip
 
 
-
         mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 clang14
-
 
 
         rm android-ndk-r24-linux.zip
@@ -193,13 +187,11 @@ jobs:
 
 
 
-    # ======================
-    # clang11
-    # ======================
+    # ==========================
+    # Clang11
+    # ==========================
 
     - name: Cache clang11
-
-      id: clang11-cache
 
       uses: actions/cache@v4
 
@@ -211,16 +203,16 @@ jobs:
 
 
 
-
-
-    - name: Install clang11
-
-      if: steps.clang11-cache.outputs.cache-hit != 'true'
+    - name: Download clang11
 
       run: |
 
-        cd $GITHUB_WORKSPACE/kernel_workspace
+        if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang11" ]; then
+          exit 0
+        fi
 
+
+        cd $GITHUB_WORKSPACE/kernel_workspace
 
 
         git clone \
@@ -232,13 +224,13 @@ jobs:
 
 
 
-    # ======================
+    # ==========================
     # Select clang
-    # ======================
+    # ==========================
 
-    - name: Select clang
+    - name: Select compiler
 
-      id: clang
+      id: compiler
 
       shell: bash
 
@@ -248,11 +240,10 @@ jobs:
         BRANCH="${{ github.event.inputs.branch || github.ref_name }}"
 
 
-
         if [[ "$BRANCH" == *"vanilla"* ]]; then
 
 
-          echo "version=clang11" >> $GITHUB_OUTPUT
+          echo "clang=clang11" >> $GITHUB_OUTPUT
 
           echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang11/bin" >> $GITHUB_OUTPUT
 
@@ -260,7 +251,7 @@ jobs:
         else
 
 
-          echo "version=clang14" >> $GITHUB_OUTPUT
+          echo "clang=clang14" >> $GITHUB_OUTPUT
 
           echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang14/bin" >> $GITHUB_OUTPUT
 
@@ -270,31 +261,26 @@ jobs:
 
 
 
-
-
     - name: Check compiler
 
       run: |
 
-        export PATH=${{ steps.clang.outputs.path }}:$PATH
+        export PATH=${{ steps.compiler.outputs.path }}:$PATH
 
 
         clang --version
 
 
-        which clang
 
+    # ==========================
+    # Install ReSukiSU
+    # ==========================
 
-
-
-
-    # ======================
-    # ReSukiSU
-    # ======================
-
-    - name: Install ReSukiSU
+    - name: Setup ReSukiSU
 
       run: |
+
+        cd $GITHUB_WORKSPACE
 
 
         curl -LSs \
@@ -305,47 +291,23 @@ jobs:
 
 
 
-    # ======================
-    # ccache
-    # ======================
-
-    - name: Setup ccache
-
-
-      uses: hendrikmuhs/ccache-action@v1.2
-
-
-      with:
-
-
-        key: mt6853-${{ github.event.inputs.branch || github.ref_name }}
-
-
-        max-size: 2G
-
-
-
-
-
-
-    # ======================
-    # Build kernel
-    # ======================
+    # ==========================
+    # Build Kernel
+    # ==========================
 
     - name: Build kernel
 
-
       shell: bash
-
 
       run: |
 
 
-        export PATH=${{ steps.clang.outputs.path }}:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
+        export PATH=${{ steps.compiler.outputs.path }}:$GITHUB_WORKSPACE/kernel_workspace/gcc64/bin:$GITHUB_WORKSPACE/kernel_workspace/gcc32/bin:$PATH
 
 
 
-        echo "Compiler:"
+        echo "Using compiler:"
+
         clang --version
 
 
@@ -358,12 +320,11 @@ jobs:
 
 
 
-
         make \
-        -j2 \
+        -j$(nproc --all) \
         O=out \
         ARCH=arm64 \
-        CC="clang" \
+        CC=clang \
         LLVM_IAS=0 \
         CLANG_TRIPLE=aarch64-linux-gnu- \
         CROSS_COMPILE=aarch64-linux-android- \
@@ -373,13 +334,11 @@ jobs:
 
 
 
-
-    # ======================
+    # ==========================
     # AnyKernel3
-    # ======================
+    # ==========================
 
     - name: Build AnyKernel3
-
 
       run: |
 
@@ -387,29 +346,25 @@ jobs:
         cd $GITHUB_WORKSPACE/kernel_workspace
 
 
-
         git clone \
         https://github.com/momo54181/AnyKernel3
 
 
 
-        sed -i 's/do.devicecheck=1/do.devicecheck=0/g' \
+        sed -i \
+        's/do.devicecheck=1/do.devicecheck=0/g' \
         AnyKernel3/anykernel.sh
 
 
 
-        sed -i 's!block=.*;!block=auto;!g' \
-        AnyKernel3/anykernel.sh
-
-
-
-        sed -i 's/is_slot_device=0;/is_slot_device=auto;/g' \
+        sed -i \
+        's/is_slot_device=0;/is_slot_device=auto;/g' \
         AnyKernel3/anykernel.sh
 
 
 
         cp \
-        $GITHUB_WORKSPACE/out/arch/arm64/boot/Image.gz-dtb \
+        out/arch/arm64/boot/Image.gz-dtb \
         AnyKernel3/
 
 
@@ -421,76 +376,58 @@ jobs:
 
 
 
-
-    # ======================
-    # Upload
-    # ======================
+    # ==========================
+    # Upload Artifact
+    # ==========================
 
     - name: Upload AnyKernel3
 
-
       uses: actions/upload-artifact@v4
-
 
       with:
 
-
         name: MT6853-AnyKernel3
-
 
         path: kernel_workspace/MT6853-*-AnyKernel3.zip
 
 
 
 
-
-
-    # ======================
+    # ==========================
     # Release
-    # ======================
+    # ==========================
 
     - name: Release
 
-
       uses: softprops/action-gh-release@v2
 
-
       with:
-
 
         tag_name:
 
           MT6853-${{ github.event.inputs.branch || github.ref_name }}-${{ github.run_id }}
 
 
-
         name:
 
-          🚀 MT6853 ${{ github.event.inputs.branch || github.ref_name }} ${{ steps.clang.outputs.version }}
-
+          MT6853 Kernel ${{ github.event.inputs.branch || github.ref_name }}
 
 
         body: |
 
-
           Branch:
-
           ${{ github.event.inputs.branch || github.ref_name }}
 
 
           Compiler:
-
-          ${{ steps.clang.outputs.version }}
+          ${{ steps.compiler.outputs.clang }}
 
 
           LLVM_IAS:
-
           disabled
 
 
-
         files: |
-
 
           kernel_workspace/MT6853-*-AnyKernel3.zip
 
