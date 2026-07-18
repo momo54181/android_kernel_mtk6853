@@ -917,7 +917,7 @@ static const struct file_operations kmalloc_origin_operations = {
 	.release	= seq_release_private,
 };
 
-int __init create_kmalloc_debug(struct proc_dir_entry *parent)
+int create_kmalloc_debug(struct proc_dir_entry *parent)
 {
 	struct proc_dir_entry *dpentry;
 	struct proc_dir_entry *opentry;
@@ -1176,7 +1176,7 @@ static const struct file_operations memleak_detect_thread_operations = {
 	.write          = memleak_detect_thread_write,
 };
 
-static int __init memleak_detect_init(void)
+static int memleak_detect_init(void)
 {
 #ifdef CONFIG_VMALLOC_DEBUG
         enable_vmalloc_debug();
@@ -1197,7 +1197,7 @@ static int __init memleak_detect_init(void)
         return 0;
 }
 #else
-static int __init memleak_detect_init(void)
+static int memleak_detect_init(void)
 {
         return 0;
 }

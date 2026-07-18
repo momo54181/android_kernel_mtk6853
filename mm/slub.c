@@ -1307,7 +1307,7 @@ out:
 	return ret;
 }
 
-static int __init setup_slub_debug(char *str)
+static int setup_slub_debug(char *str)
 {
 	slub_debug = DEBUG_DEFAULT_FLAGS;
 	if (*str++ != '=' || !*str)
@@ -3925,7 +3925,7 @@ int __kmem_cache_shutdown(struct kmem_cache *s)
  *		Kmalloc subsystem
  *******************************************************************/
 
-static int __init setup_slub_min_order(char *str)
+static int setup_slub_min_order(char *str)
 {
 	get_option(&str, &slub_min_order);
 
@@ -3934,7 +3934,7 @@ static int __init setup_slub_min_order(char *str)
 
 __setup("slub_min_order=", setup_slub_min_order);
 
-static int __init setup_slub_max_order(char *str)
+static int setup_slub_max_order(char *str)
 {
 	get_option(&str, &slub_max_order);
 	slub_max_order = min(slub_max_order, MAX_ORDER - 1);
@@ -3944,7 +3944,7 @@ static int __init setup_slub_max_order(char *str)
 
 __setup("slub_max_order=", setup_slub_max_order);
 
-static int __init setup_slub_min_objects(char *str)
+static int setup_slub_min_objects(char *str)
 {
 	get_option(&str, &slub_min_objects);
 
@@ -4941,7 +4941,7 @@ enum slab_stat_type {
 #ifdef CONFIG_MEMCG
 static bool memcg_sysfs_enabled = IS_ENABLED(CONFIG_SLUB_MEMCG_SYSFS_ON);
 
-static int __init setup_slub_memcg_sysfs(char *str)
+static int setup_slub_memcg_sysfs(char *str)
 {
 	int v;
 
@@ -6025,7 +6025,7 @@ static int sysfs_slab_alias(struct kmem_cache *s, const char *name)
 	return 0;
 }
 
-static int __init slab_sysfs_init(void)
+static int slab_sysfs_init(void)
 {
 	struct kmem_cache *s;
 	int err;
@@ -6110,7 +6110,7 @@ ssize_t slabinfo_write(struct file *file, const char __user *buffer,
 /* calc the stack hash */
 #include "malloc_track/slub_track.c"
 #else
-int __init __weak create_kmalloc_debug(struct proc_dir_entry *parent)
+int __weak create_kmalloc_debug(struct proc_dir_entry *parent)
 {
 	pr_warn("OPLUS_FEATURE_MEMLEAK_DETECT is off.\n");
 	return 0;
