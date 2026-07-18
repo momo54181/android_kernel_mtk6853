@@ -1403,3 +1403,10 @@ static struct usb_function *acc_alloc(struct usb_function_instance *fi)
 }
 DECLARE_USB_FUNCTION_INIT(accessory, acc_alloc_inst, acc_alloc);
 MODULE_LICENSE("GPL");
+
+int acc_ctrlrequest_composite(struct usb_composite_dev *cdev,
+                              const struct usb_ctrlrequest *ctrl)
+{
+    return -EOPNOTSUPP;  // 或者直接返回 0
+}
+EXPORT_SYMBOL(acc_ctrlrequest_composite);

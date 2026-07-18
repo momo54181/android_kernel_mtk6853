@@ -1188,3 +1188,9 @@ static const struct file_operations rndis_proc_fops = {
 #define	NAME_TEMPLATE "driver/rndis-%03d"
 
 #endif /* CONFIG_USB_GADGET_DEBUG_FILES */
+
+void rndis_set_max_pkt_xfer(struct rndis_params *params, u8 max_pkt_per_xfer)
+{
+    // 空实现，或者将值存入 params 中（视情况）
+}
+EXPORT_SYMBOL(rndis_set_max_pkt_xfer);
