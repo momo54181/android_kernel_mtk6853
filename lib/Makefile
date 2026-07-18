@@ -276,3 +276,5 @@ obj-$(CONFIG_SBITMAP) += sbitmap.o
 obj-$(CONFIG_PARMAN) += parman.o
 
 obj-y += crypto/
+
+obj-$(CONFIG_CRYPTO_CHACHA20) += chacha20.o
