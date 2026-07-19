@@ -173,6 +173,7 @@ jobs:
     - name: Setup ReSukiSU
       run: |
         cd $GITHUB_WORKSPACE
+        rm -rf KernelSU
         curl -LSs \
           https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh \
           | bash
