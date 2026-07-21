@@ -29,7 +29,17 @@ jobs:
       with:
         ref: ${{ github.event.inputs.branch || github.ref_name }}
         fetch-depth: 10
-        submodules: recursive
+
+    - name: Update KernelSU
+      run: |
+        git submodule update --init --recursive
+        cd KernelSU
+        git fetch --all
+        git checkout main
+        git pull
+        cd ..
+        git add KernelSU
+
 
     # ==========================
     # Dependencies
