@@ -12,7 +12,6 @@
 本项目基于 OPlus 官方内核源码进行维护，并集成：
 
 - ReSukiSU 内核特权框架
-- 多 Clang 编译环境支持
 - GitHub Actions 自动化 CI/CD
 - AnyKernel3 自动刷包生成
 
@@ -99,11 +98,11 @@ MT6853-xxx-AnyKernel3.zip
 
 | Branch | Clang |
 |-|-|
-| kernel-main | Android NDK r24 Clang |
-| kernel-dev | Android NDK r24 Clang |
+| kernel-main | Android NDK r28c Clang |
+| kernel-dev | Android NDK r28c Clang |
 | vanilla | crDroid Clang 11 |
 | vanilla-* | crDroid Clang 11 |
-| 其他 | Android NDK r24 Clang |
+| 其他 | Android NDK r28c Clang |
 
 
 GitHub Actions 会根据分支名称自动选择对应工具链。
@@ -113,7 +112,7 @@ GitHub Actions 会根据分支名称自动选择对应工具链。
 ```
 kernel-main
         ↓
-clang14
+clang19
 
 
 vanilla-test
@@ -138,7 +137,7 @@ Ubuntu 22.04 LTS
 默认：
 
 ```
-Android NDK r24 Clang
+Android NDK r28c Clang
 ```
 
 用于：
@@ -244,7 +243,7 @@ NDK r24 Clang
 例如：
 
 ```bash
-export PATH=/path/to/clang14/bin:/path/to/gcc64/bin:/path/to/gcc32/bin:$PATH
+export PATH=/path/to/clang19/bin:/path/to/gcc64/bin:/path/to/gcc32/bin:$PATH
 ```
 
 
