@@ -192,19 +192,19 @@ jobs:
 
 
     # ==========================
-    # Clang14
+    # Clang19 (NDK r28c)
     # ==========================
-    - name: Cache clang14
+    - name: Cache clang19
       uses: actions/cache@v4
       with:
-        path: kernel_workspace/clang14
-        key: clang14-ndk-r24
+        path: kernel_workspace/clang19
+        key: clang19-ndk-r28c
 
 
-    - name: Download clang14
+    - name: Download clang19
       run: |
 
-        if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang14" ]; then
+        if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang19" ]; then
           exit 0
         fi
 
@@ -213,20 +213,20 @@ jobs:
 
 
         wget -q \
-        https://dl.google.com/android/repository/android-ndk-r24-linux.zip
+        https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
 
 
-        unzip -q android-ndk-r24-linux.zip
+        unzip -q android-ndk-r28c-linux.zip
 
 
-        mv android-ndk-r24/toolchains/llvm/prebuilt/linux-x86_64 \
-          clang14
+        mv android-ndk-r28c/toolchains/llvm/prebuilt/linux-x86_64 \
+          clang19
 
 
-        rm android-ndk-r24-linux.zip
+        rm android-ndk-r28c-linux.zip
 
     # ==========================
-    # Clang11
+    # Clang11 (for vanilla branch)
     # ==========================
     - name: Cache clang11
       uses: actions/cache@v4
@@ -272,9 +272,9 @@ jobs:
 
         else
 
-          echo "clang=clang14" >> $GITHUB_OUTPUT
+          echo "clang=clang19" >> $GITHUB_OUTPUT
 
-          echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang14/bin" \
+          echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang19/bin" \
             >> $GITHUB_OUTPUT
 
         fi
@@ -431,6 +431,7 @@ jobs:
 
 
           Branch:
+
 
           ```
           ${{ github.event.inputs.branch || 'kernel-main' }}
