@@ -192,16 +192,16 @@ jobs:
 
 
     # ==========================
-    # Clang19 (NDK r28c)
+    # Clang19 (NDK r29)
     # ==========================
-    - name: Cache clang19
+    - name: Cache clang21
       uses: actions/cache@v4
       with:
         path: kernel_workspace/clang19
         key: clang19-ndk-r28c
 
 
-    - name: Download clang19
+    - name: Download clang21
       run: |
 
         if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang19" ]; then
@@ -213,17 +213,17 @@ jobs:
 
 
         wget -q \
-        https://dl.google.com/android/repository/android-ndk-r28c-linux.zip
+        https://dl.google.com/android/repository/android-ndk-r29-linux.zip
 
 
-        unzip -q android-ndk-r28c-linux.zip
+        unzip -q android-ndk-r29-linux.zip
 
 
-        mv android-ndk-r28c/toolchains/llvm/prebuilt/linux-x86_64 \
+        mv android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64 \
           clang19
 
 
-        rm android-ndk-r28c-linux.zip
+        rm android-ndk-r29-linux.zip
 
     # ==========================
     # Clang11 (for vanilla branch)
