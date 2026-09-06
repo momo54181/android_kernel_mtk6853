@@ -192,19 +192,19 @@ jobs:
 
 
     # ==========================
-    # Clang19 (NDK r29)
+    # Clang21 (NDK r29)
     # ==========================
     - name: Cache clang21
       uses: actions/cache@v4
       with:
-        path: kernel_workspace/clang19
-        key: clang19-ndk-r28c
+        path: kernel_workspace/clang21
+        key: clang21-ndk-r28c
 
 
     - name: Download clang21
       run: |
 
-        if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang19" ]; then
+        if [ -d "$GITHUB_WORKSPACE/kernel_workspace/clang21" ]; then
           exit 0
         fi
 
@@ -220,7 +220,7 @@ jobs:
 
 
         mv android-ndk-r29/toolchains/llvm/prebuilt/linux-x86_64 \
-          clang19
+          clang21
 
 
         rm android-ndk-r29-linux.zip
@@ -272,9 +272,9 @@ jobs:
 
         else
 
-          echo "clang=clang19" >> $GITHUB_OUTPUT
+          echo "clang=clang21" >> $GITHUB_OUTPUT
 
-          echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang19/bin" \
+          echo "path=$GITHUB_WORKSPACE/kernel_workspace/clang21/bin" \
             >> $GITHUB_OUTPUT
 
         fi
